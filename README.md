@@ -1,116 +1,22 @@
-# Holographic-Quantum-Neural-Network-HQNN-
+# Holographic Quantum Neural Network (HQNN)
 
-# HQNN
+This repository implements a small HaPPY-inspired tensor-network encoder seeded by the `[[5,1,3]]` five-qubit stabilizer code, followed by a trainable PennyLane boundary circuit. It is HaPPY-inspired rather than a full HaPPY code, and QEC-inspired rather than a syndrome-based error-correction decoder.
 
-A research-stage implementation of a **Holographic Quantum Neural Network (HQNN)** pipeline built from perfect tensors, a small hyperbolic tensor network, and a trainable boundary quantum circuit.
+## Pipeline
 
-This repository is currently an **ongoing prototype**, not a finished framework. At the moment it contains three connected stages:
+1. `Perfect_tensor_1.py` constructs the standard five-qubit code from four stabilizer generators. Its encoding isometry has shape `(32, 2)` and becomes a logical-first six-leg tensor with shape `(2, 2, 2, 2, 2, 2)`: axis 0 is logical and axes 1–5 are physical.
+2. `Tensor_network_2.py` contracts physical legs of one central and two leaf tensors. Three logical legs and eleven boundary legs remain, producing `E : C^8 -> C^2048` with array shape `(2048, 8)`. The script verifies `E†E = I_8`.
+3. `Ansatz_training_3.py` trains an eleven-qubit boundary circuit and studies the effective logical map `E† U_boundary(theta) E`. Each of three layers applies RX, RY, and RZ to every boundary qubit, followed by valid CNOT pairs at distances `[1, 2, 4, 8]`. The parameter shape is `(3, 11, 3)`, for 99 parameters. The loss is one minus average logical-state fidelity.
 
-1. **Perfect tensor construction** from a stabilizer-code-inspired setup
-2. **Hyperbolic tensor network assembly** into an encoding map
-3. **Boundary ansatz training** for quantum state reconstruction
+## Run
 
-The pipeline implemented in the current codebase is:
-
-```text
-|psi_out> = E† · U_boundary(theta) · E · |psi_in>
-```
-
-where:
-- `E` is the encoding map produced by the tensor network
-- `U_boundary(theta)` is a trainable boundary circuit
-- `E†` decodes back to the logical space
-
-The first training task is **state reconstruction**: the model is trained so that `|psi_out> ≈ |psi_in>`.
-
----
-
-## What this repo currently does
-
-### Stage 1 — `Perfect_tensor_1.py`
-Builds a candidate perfect tensor from a `[[6,2,3]]` CSS stabilizer code construction.
-
-It currently:
-- defines Pauli operators and stabilizer generators
-- checks Hermiticity and stabilizer commutation
-- projects onto the code space
-- extracts an isometry via SVD
-- reshapes the isometry into an 8-leg tensor
-- checks the perfect-tensor/isometry condition across bipartitions
-- saves `perfect_tensor.npy`
-
-### Stage 2 — `Tensor_network_2.py`
-Builds a small **3-node holographic tensor network** from the tensor saved in Stage 1.
-
-It currently:
-- loads `perfect_tensor.npy`
-- constructs a graph with one central tensor and two leaf tensors
-- assigns index labels for contractions
-- contracts the network using `opt_einsum`
-- separates boundary and bulk/logical legs
-- reshapes the result into an encoding map `E`
-- verifies the network isometry `E†E = I`
-- saves `network_tensor.npy` and `encoding_map.npy`
-
-### Stage 3 — `Ansatz_training_3.py`
-Adds a **trainable boundary quantum circuit** using PennyLane and trains it on random logical states.
-
-It currently:
-- loads `encoding_map.npy`
-- generates random normalized logical states
-- encodes them into the boundary Hilbert space
-- defines a layered boundary ansatz with single-qubit rotations and multi-scale CNOT connectivity
-- trains the circuit using Adam on the loss `1 - average fidelity`
-- evaluates training and simple generalization performance
-- saves `trained_params.npy` and `training_curve.png`
-
----
-
-
-## Scientific idea
-
-This code explores a simple holographic learning pipeline inspired by:
-- **quantum error correcting codes**
-- **perfect tensors**
-- **holographic tensor networks / HaPPY-style ideas**
-- **variational quantum circuits**
-
-
-
----
-
-## How to run
-
-Run the files in order.
-
-### 1) Build the tensor
 ```bash
 python Perfect_tensor_1.py
-```
-
-This produces:
-- `perfect_tensor.npy`
-
-### 2) Assemble the network
-```bash
 python Tensor_network_2.py
+python Ansatz_training_3.py --quick
+python smoke_test.py
 ```
 
-This produces:
-- `network_tensor.npy`
-- `encoding_map.npy`
+Remove `--quick` for the full Stage 3 training configuration. Generated artifacts are `perfect_tensor.npy`, `network_tensor.npy`, `encoding_map.npy`, `trained_params.npy`, and `training_curve.png`. Shape validation prevents Stage 3 from loading an incompatible encoding artifact.
 
-### 3) Train the boundary circuit
-```bash
-python Ansatz_training_3.py
-```
-
-This produces:
-- `trained_params.npy`
-- `training_curve.png`
-
----
-
-
-
-
+The installable package under `src/pennylane_holographic/` exposes the same construction through a Python API and CLI. Run its test suite with `pytest`.
